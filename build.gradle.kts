@@ -84,21 +84,23 @@ kotlin {
     }
 }
 
-val resourceTasks = listOf(
+val orderedResourceTasks = listOf(
     "checkDebugAarMetadata",
+    "generateDebugBuildConfig",
+    "mergeDebugNativeDebugMetadata",
     "dataBindingMergeDependencyArtifactsDebug",
-    "packageDebugResources",
-    "parseDebugLocalResources",
     "generateDebugResources",
     "mergeDebugResources",
-    "mergeDebugNativeDebugMetadata",
-    "generateDebugBuildConfig"
+    "parseDebugLocalResources",
+    "packageDebugResources",
+    "mapDebugSourceSetPaths"
 )
 
-tasks.matching { it.name in resourceTasks }.configureEach {
-    mustRunAfter(resourceTasks.filter { dep -> dep != name })
-}
-
-tasks.matching { it.name == "mapDebugSourceSetPaths" }.configureEach {
-    mustRunAfter(resourceTasks)
+orderedResourceTasks.forEachIndexed { index, taskName ->
+    if (index > 0) {
+        val previousTasks = orderedResourceTasks.subList(0, index)
+        tasks.matching { it.name == taskName }.configureEach {
+            mustRunAfter(previousTasks)
+        }
+    }
 }

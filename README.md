@@ -1,129 +1,82 @@
-Прошло много времени с момента последнего обновления. Сейчас я снова сажусь за этот проект. Спасибо за донаты и комментарии! Возможно, в будущем появится отдельная группа или канал для этого приложения. Спасибо!
-
 <div align="center">
   
-# ByeByeDPI × TG
-
-**Обход блокировок сайтов и прокси для Telegram — в одном приложении**
-
+  # Telegram WS Proxy Android
 <br>
-
-<a href="https://github.com/EwenLoy/ByeByeDPI-x-tg/releases/latest">
-  <img src="https://img.shields.io/github/v/release/EwenLoy/ByeByeDPI-x-tg?style=for-the-badge&logo=github&label=Release&color=0aa1dd" alt="Release">
-</a>
-<img src="https://img.shields.io/badge/Android-SDK_21--36-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android SDK">
-<img src="https://img.shields.io/badge/Rust-1.70%2B-000000?style=for-the-badge&logo=rust&logoColor=white" alt="Rust Version">
-<img src="https://img.shields.io/badge/Kotlin-Native-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" alt="Kotlin">
-<a href="https://github.com/EwenLoy/ByeByeDPI-x-tg/stargazers">
-  <img src="https://img.shields.io/github/stars/EwenLoy/ByeByeDPI-x-tg?style=for-the-badge&logo=github&color=ffca28&labelColor=24292e" alt="Stars">
-</a>
-<a href="https://github.com/EwenLoy/ByeByeDPI-x-tg/releases">
-  <img src="https://img.shields.io/github/downloads/EwenLoy/ByeByeDPI-x-tg/total?style=for-the-badge&logo=github&label=Downloads&color=ff6d00&labelColor=24292e" alt="Downloads">
-</a>
-
+  <img src="https://img.shields.io/badge/Android-SDK_24--36-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android SDK">
+  <img src="https://img.shields.io/badge/Rust-1.70+-000000?style=for-the-badge&logo=rust&logoColor=white" alt="Rust Version">
+  <img src="https://img.shields.io/badge/Kotlin-Native-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" alt="Kotlin">
+  <a href="https://github.com/amurcanov/tg-ws-proxy-android/stargazers">
+    <img src="https://img.shields.io/github/stars/amurcanov/tg-ws-proxy-android?style=for-the-badge&logo=github&color=ffca28&labelColor=24292e" alt="Stars">
+  </a>
 </div>
 <br>
 
-**ByeByeDPI × TG** — это два инструмента под одной крышей: **обход блокировок сайтов** на ядре `byedpi` и локальный **MTProto-прокси для Telegram**, который перенаправляет трафик мессенджера через защищённые CloudFlare WebSocket-соединения. YouTube открывается, Telegram оживает — нажатием одной кнопки каждое.
-
-<!-- Скриншот главного экрана: сделай скрин приложения и вставь сюда
-<img width="..." src="..." />
--->
+**TG WS Proxy Android** — это локальный **MTProto-прокси** для Telegram на Android. Приложение помогает частично решать проблемы и в ряде сценариев ускоряет работу мессенджера, перенаправляя трафик через защищённые CloudFlare WebSocket-соединения или напрямую к датацентрам Telegram.
 
 ---
 
-## Возможности
+<img width="972" height="696" alt="MyCollages (5)" src="https://github.com/user-attachments/assets/7c9b9f2a-fc60-4aee-b93d-db950e24555c" />
 
-- **Два переключателя вместо десяти настроек:** сайты и Telegram управляются отдельно, статус обоих виден на главном экране.
-- **Интеграция с Telegram:** кнопка **«Подключить прокси в Telegram»** передаёт MTProto-прокси в совместимые клиенты ссылкой `t.me/proxy` (официальный, AyuGram, Plus Messenger, NekoGram и другие).
-- **Проверка стратегий:** приложение само перебирает варианты обхода и показывает рабочие — как на реальных телефонах, так и «из коробки».
-- **Диагностика TG WS одной кнопкой:** сервис, порт, нативное ядро и доступность серверов проверяются сами, с человеческим вердиктом.
-- **Лог-вьюер:** живые логи обоих движков с фильтрами — видно, что происходит с подключением прямо сейчас.
-- **Тёмная и светлая темы,** автозапуск при включении телефона и защита от выгрузки из памяти.
+## Возможности Android-версии
+
+- **Современный UI/UX:** приложение полностью адаптировано под актуальный Android-интерфейс на базе Material 3 и Jetpack Compose. Основные действия доступны быстро и без перегруженных экранов.
+- **Интеграция с Telegram:** кнопка **«Применить в Telegram»** автоматически передаёт прокси в совместимые клиенты через `tg://proxy` (AyuGram, Plus Messenger, NekoGram и другие).
+- **Фоновый режим:** используется `Foreground Service`, уведомление о работе сервиса и дополнительная логика удержания соединения, чтобы Android не выгружал прокси слишком агрессивно.
+- **Лог-вьюер:** встроенный просмотр событий в реальном времени помогает быстро понять, что происходит с подключением, маршрутом и пулом соединений.
+- **Темы и палитры:** поддерживаются Dynamic Colors на Android 12+, а также встроенные палитры для более старых устройств.
+- **Авто-обновления внутри приложения:** вручную проверять релизы больше не нужно — когда выйдет новая версия, приложение само покажет уведомление об обновлении.
+- **Раздел «Информация»:** внутри приложения есть расширенная справка по настройкам, особенностям CloudFlare, пулу WS-соединений и ручной конфигурации датацентров.
 
 ---
 
 ## Как это работает
 
 ```text
-Telegram → 127.0.0.1:1082 (MTProto) → движок на Rust → WSS (через CloudFlare или напрямую) → Telegram DC
+Telegram Android → Локальный MTProto (по умолчанию 127.0.0.1:1443) → TG WS Proxy → WSS (через CloudFlare или напрямую) → Telegram DC
 ```
 
-1. Приложение поднимает локальный MTProto-прокси средствами нативного движка на языке **Rust** (порт по умолчанию — `1082`, секрет генерируется сам).
-2. Извлекает из пакета номер датацентра и устанавливает защищённое WebSocket-соединение с нужным DC, при необходимости проксируя через CloudFlare.
-3. Держит пул соединений и переподключается при обрывах — чтобы в реальных сетях не отваливалось.
-
-Сайтами в это же время занимается ядро [byedpi](https://github.com/hufrea/byedpi): desync-методы fake/split/oob и списки доменов настраиваются прямо в приложении.
-
----
+1. Приложение поднимает локальный MTProto-прокси средствами нативного движка на языке **Rust**.
+2. Перехватывает подключения Telegram через локальный порт и сгенерированный секретный ключ.
+3. Извлекает `DC ID` из исходного пакета и устанавливает защищённое WebSocket (`TLS`) соединение с нужным датацентром, при необходимости проксируя трафик через CloudFlare.
+4. Использует пул соединений, keepalive-механику и fallback-сценарии для более устойчивой работы в реальных сетевых условиях.
 
 ## Быстрый старт
 
-1. Скачайте актуальный APK со **[страницы релизов](https://github.com/EwenLoy/ByeByeDPI-x-tg/releases/latest)**.
-2. Установите приложение (Android попросит разрешить установку — это нормально, приложение мимо Google Play).
-3. Нажмите большую кнопку ⏻ — заработают сайты.
-4. Для Telegram включите зелёный переключатель **TG WS**.
-5. Нажмите **«Подключить прокси в Telegram»** и подтвердите прокси в мессенджере.
-6. Не завелось? Меню теста → **«Проверить TG WS»** — приложение само покажет, где затык.
+1. Скачайте актуальный `APK` со **[страницы релизов](https://github.com/amurcanov/tg-ws-proxy-android/releases)**.
+2. Установите приложение на ваш Android-смартфон.
+3. Откройте **TG WS Proxy Android**.
+4. Ознакомьтесь со справкой внутри приложения.
+5. Нажмите **«Запустить прокси»** — появится уведомление о работе в фоновом режиме.
+6. Нажмите **«Применить в Telegram»** — откроется Telegram-клиент, где останется только подтвердить подключение.
 
 ---
 
-* **Краши и проблемы:** если приложение вылетает или не ставится — сохраните логи (меню ⋮ → «Логи TG WS») и приложите их к issue.
-
-> [!NOTE]
-> ### Отчёты об ошибках
-> Приложение адаптировано под мобильные сети, однако фоновой работе могут мешать агрессивные оптимизации батареи — разрешите приложению их игнорировать при первом запуске.
->
-> Мелкие ошибки в логах при нормально работающем прокси можно игнорировать. Перед созданием issue загляните в «Проверку стратегий» и «Проверить TG WS» — часто ответ уже там.
-
----
-
-<details>
-<summary>🔨 <b>Сборка из исходников</b></summary>
-
-<br>
-
-Каждый пуш собирается GitHub Actions ([вкладка Actions](https://github.com/EwenLoy/ByeByeDPI-x-tg/actions)), пуш тега `v*` создаёт релиз, коммит с `[skip ci]` сборку пропускает.
-
-Локально:
-
-```bash
-git clone https://github.com/EwenLoy/ByeByeDPI-x-tg.git
-cd ByeByeDPI-x-tg
-./gradlew assembleDebug
-# APK: app/build/outputs/apk/debug/
-```
-
-Нужны JDK 17 и Android SDK (NDK скачается сам). Собирать Rust **не нужно** — готовые `.so` движка уже лежат в `app/src/main/tglibs/`.
-
-</details>
-
-<details>
-<summary>💙 <b>Цепочка форков и благодарности</b></summary>
-
-<br>
-
-**Сайты:** [hufrea/byedpi](https://github.com/hufrea/byedpi) (ядро) → [romanvht/ByeByeDPI](https://github.com/romanvht/ByeByeDPI) (Android-обёртка) → **этот форк** (текущая база — ByeByeDPI **1.8.2**, ядро byedpi `ba53229`)
-
-**Telegram:** идея — [Flowseal/tg-ws-proxy](https://github.com/Flowseal/tg-ws-proxy), Android-версия с Rust-движком — [amurcanov/tg-ws-proxy-android](https://github.com/amurcanov/tg-ws-proxy-android) → интегрировано в этот форк
-
-Спасибо авторам оригинальных проектов 💙
-
-</details>
-
-## Лицензия
-
-Этот форк распространяется под лицензией **GPLv3** (см. [LICENSE](LICENSE)).
-
-- **ByeByeDPI для Android** и его разработчик [romanvht](https://github.com/romanvht) — спасибо за основу приложения 💙
-- Ядро [byedpi](https://github.com/hufrea/byedpi) от [hufrea](https://github.com/hufrea)
-- Оригинальный `tg-ws-proxy` от [Flowseal](https://github.com/Flowseal) доступен под **MIT**
-- Android-порт с Rust-движком — [amurcanov/tg-ws-proxy-android](https://github.com/amurcanov/tg-ws-proxy-android)
-
----
+# 🎦 Видео гайд по установке и использованию
 
 <div align="center">
 
-Помогло? Кинь ⭐ репозиторию и/или [поддержи автора](https://dalink.to/ewenloy) ❤️
+<img width="1376" height="768" alt="578516258-6b2df494-de8d-44a2-a281-389fc7551a7c" src="https://github.com/user-attachments/assets/ed1449d4-0a14-4b46-8f35-b787bdee3e32" />
+
+<br><br>
+
+[**Смотреть на YouTube**](https://youtu.be/RP4RwyEHpwc) | [**Смотреть в Telegram**](https://t.me/avencoreschat/506796)
 
 </div>
+
+---
+
+
+* **Краши и проблемы с установкой:** если у вас возникают сбои, вылеты или ошибки при установке, пожалуйста, сохраняйте отчёты и ссылки на них. Также ознакомьтесь с блоком `NOTE` ниже и поднимайте полноценные `issue` с полезной технической информацией.
+
+
+> [!NOTE]
+> ### Отчёты об ошибках
+> Приложение адаптировано под мобильные сети, однако проблемы с фоновой работой всё ещё возможны из-за системных ограничений или сети.
+>
+> Если у вас возникла проблема, сбой или вопрос, пожалуйста, нажмите кнопку **«Собрать отчёт»** внутри приложения и приложите полученные данные к вашему `issue`. Мелкие ошибки в логах при нормально работающем прокси можно игнорировать.
+
+---
+
+## Лицензия
+
+Этот форк распространяется под лицензией **GPLv3**. Оригинальный код `tg-ws-proxy` от [Flowseal](https://github.com/Flowseal) доступен под лицензией **MIT**.

@@ -87,3 +87,7 @@ kotlin {
 tasks.matching { it.name == "generateDebugResources" }.configureEach {
     mustRunAfter("mergeDebugNativeDebugMetadata", "dataBindingMergeDependencyArtifactsDebug")
 }
+
+tasks.matching { it.name == "packageDebugResources" }.configureEach {
+    mustRunAfter("mergeDebugResources")
+}

@@ -73,7 +73,6 @@ android {
         getByName("main") {
             manifest.srcFile("AndroidManifest.xml")
             java.setSrcDirs(listOf("."))
-            java.exclude("ToggleActivity.kt", "**/ToggleActivity.kt")
             res.srcDirs("res", "src/main/res")
         }
     }

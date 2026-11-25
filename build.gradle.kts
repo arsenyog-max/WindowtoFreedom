@@ -83,3 +83,7 @@ kotlin {
         jvmTarget.set(JvmTarget.JVM_17)
     }
 }
+
+tasks.matching { it.name == "generateDebugResources" }.configureEach {
+    mustRunAfter("mergeDebugNativeDebugMetadata", "dataBindingMergeDependencyArtifactsDebug")
+}

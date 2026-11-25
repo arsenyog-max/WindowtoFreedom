@@ -5,14 +5,12 @@ import java.util.Locale
 import java.util.Properties
 
 plugins {
-    id("com.android.application") version "8.11.0" 
-    id("org.jetbrains.kotlin.android") version "2.2.0" 
+    id("com.android.application") version "8.11.0"
+    id("org.jetbrains.kotlin.android") version "2.2.0"
 }
 
 val abis = setOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
 
-// Release signing: secrets come from CI environment variables or local.properties.
-// The keystore itself must NOT be committed to the repository.
 val localProperties = Properties().apply {
     val propertiesFile = rootProject.file("local.properties")
     if (propertiesFile.exists()) propertiesFile.inputStream().use { load(it) }
@@ -69,6 +67,14 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    sourceSets {
+        getByName("main") {
+            manifest.srcFile("AndroidManifest.xml")
+            java.srcDirs(".")
+            res.srcDirs(".")
+        }
     }
 }
 

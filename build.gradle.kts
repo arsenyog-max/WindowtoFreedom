@@ -5,8 +5,8 @@ import java.util.Locale
 import java.util.Properties
 
 plugins {
-    id("com.android.application") version "8.11.0" apply false
-    id("org.jetbrains.kotlin.android") version "2.2.0" apply false
+    id("com.android.application") version "8.11.0" 
+    id("org.jetbrains.kotlin.android") version "2.2.0" 
 }
 
 val abis = setOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")

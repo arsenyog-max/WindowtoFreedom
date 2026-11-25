@@ -73,7 +73,6 @@ android {
         getByName("main") {
             manifest.srcFile("AndroidManifest.xml")
             java.srcDirs(".")
-            res.srcDirs(".")
         }
     }
 }
@@ -82,23 +81,4 @@ kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)
     }
-}
-
-val prereqTasks = listOf(
-    "checkDebugAarMetadata",
-    "generateDebugBuildConfig",
-    "mergeDebugNativeDebugMetadata",
-    "dataBindingMergeDependencyArtifactsDebug"
-)
-
-tasks.matching { it.name == "generateDebugResources" }.configureEach {
-    mustRunAfter(prereqTasks)
-}
-
-tasks.matching { it.name == "mergeDebugResources" }.configureEach {
-    mustRunAfter(prereqTasks + "generateDebugResources")
-}
-
-tasks.matching { it.name == "mapDebugSourceSetPaths" }.configureEach {
-    mustRunAfter(prereqTasks + listOf("generateDebugResources", "mergeDebugResources"))
 }

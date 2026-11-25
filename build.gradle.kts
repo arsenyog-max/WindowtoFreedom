@@ -88,17 +88,22 @@ tasks.matching { it.name == "generateDebugResources" }.configureEach {
     mustRunAfter(
         "mergeDebugNativeDebugMetadata",
         "dataBindingMergeDependencyArtifactsDebug",
-        "generateDebugBuildConfig"
+        "generateDebugBuildConfig",
+        "checkDebugAarMetadata"
     )
 }
 
 tasks.matching { it.name == "packageDebugResources" }.configureEach {
     mustRunAfter(
         "mergeDebugResources",
-        "generateDebugBuildConfig"
+        "generateDebugBuildConfig",
+        "checkDebugAarMetadata"
     )
 }
 
 tasks.matching { it.name == "mergeDebugResources" }.configureEach {
-    mustRunAfter("generateDebugBuildConfig")
+    mustRunAfter(
+        "generateDebugBuildConfig",
+        "checkDebugAarMetadata"
+    )
 }

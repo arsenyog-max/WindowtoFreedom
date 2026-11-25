@@ -100,3 +100,19 @@ tasks.matching { it.name == "mergeDebugResources" }.configureEach {
 tasks.matching { it.name == "packageDebugResources" }.configureEach {
     mustRunAfter("mergeDebugResources")
 }
+
+tasks.matching { it.name == "compileDebugKotlin" }.configureEach {
+    mustRunAfter(
+        "checkDebugAarMetadata",
+        "generateDebugBuildConfig",
+        "mergeDebugNativeDebugMetadata",
+        "dataBindingMergeDependencyArtifactsDebug",
+        "generateDebugResources",
+        "mergeDebugResources",
+        "packageDebugResources",
+        "mergeDebugAssets",
+        "compressDebugAssets",
+        "desugarDebugFileDependencies",
+        "mergeDebugShaders"
+    )
+}

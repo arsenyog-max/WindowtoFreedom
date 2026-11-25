@@ -84,26 +84,21 @@ kotlin {
     }
 }
 
-tasks.matching { it.name == "generateDebugResources" }.configureEach {
-    mustRunAfter(
-        "mergeDebugNativeDebugMetadata",
-        "dataBindingMergeDependencyArtifactsDebug",
-        "generateDebugBuildConfig",
-        "checkDebugAarMetadata"
-    )
+val resourceTasks = listOf(
+    "checkDebugAarMetadata",
+    "dataBindingMergeDependencyArtifactsDebug",
+    "packageDebugResources",
+    "parseDebugLocalResources",
+    "generateDebugResources",
+    "mergeDebugResources",
+    "mergeDebugNativeDebugMetadata",
+    "generateDebugBuildConfig"
+)
+
+tasks.matching { it.name in resourceTasks }.configureEach {
+    mustRunAfter(resourceTasks.filter { dep -> dep != name })
 }
 
-tasks.matching { it.name == "packageDebugResources" }.configureEach {
-    mustRunAfter(
-        "mergeDebugResources",
-        "generateDebugBuildConfig",
-        "checkDebugAarMetadata"
-    )
-}
-
-tasks.matching { it.name == "mergeDebugResources" }.configureEach {
-    mustRunAfter(
-        "generateDebugBuildConfig",
-        "checkDebugAarMetadata"
-    )
+tasks.matching { it.name == "mapDebugSourceSetPaths" }.configureEach {
+    mustRunAfter(resourceTasks)
 }

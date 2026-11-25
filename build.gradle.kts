@@ -116,6 +116,8 @@ tasks.matching { it.name == "compileDebugKotlin" }.configureEach {
         "mergeDebugShaders",
         "mergeDebugJniLibFolders",
         "mergeExtDexDebug",
-        "checkDebugDuplicateClasses"
+        "checkDebugDuplicateClasses",
+        "mergeLibDexDebug",
+        "validateSigningDebug"
     )
 }

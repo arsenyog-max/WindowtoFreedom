@@ -1,4 +1,4 @@
-package io.github.romanvht.byedpi.views
+package io.github.romanvht.byedpi
 
 import android.animation.ValueAnimator
 import android.content.Context
@@ -27,25 +27,30 @@ class CodeEyeView @JvmOverloads constructor(
         CONNECTED
     }
 
+    private val colorLid = Color.parseColor("#90A4AE")
+    private val colorOpenEye = Color.parseColor("#E0F2F1")
+    private val colorPupilGreen = Color.parseColor("#00FF66")
+    private val colorSandGreen = Color.parseColor("#00E676")
+
     private var currentState: EyeState = EyeState.CLOSED
     private var openProgress: Float = 0f
 
     private val eyePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = Typeface.MONOSPACE
         textAlign = Paint.Align.CENTER
-        color = Color.parseColor("#B8C4CC")
+        color = colorLid
     }
 
     private val pupilPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = Typeface.MONOSPACE
         textAlign = Paint.Align.CENTER
-        color = Color.parseColor("#00FF66")
+        color = colorPupilGreen
     }
 
     private val sandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = Typeface.MONOSPACE
         textAlign = Paint.Align.CENTER
-        color = Color.parseColor("#00E676")
+        color = colorSandGreen
     }
 
     private data class SandGrain(
@@ -72,17 +77,26 @@ class CodeEyeView @JvmOverloads constructor(
 
     private fun initSand() {
         sandGrains.clear()
-        repeat(52) {
+        repeat(48) {
             sandGrains.add(
                 SandGrain(
-                    xRatio = Random.nextFloat() * 0.72f - 0.36f,
+                    xRatio = Random.nextFloat() * 0.7f - 0.35f,
                     y = Random.nextFloat() * 160f,
-                    speed = Random.nextFloat() * 95f + 75f,
+                    speed = Random.nextFloat() * 90f + 70f,
                     digit = digits.random(),
-                    alpha = Random.nextInt(100, 240)
+                    alpha = Random.nextInt(90, 230)
                 )
             )
         }
+    }
+
+    fun toggleDemoState() {
+        val next = when (currentState) {
+            EyeState.CLOSED -> EyeState.CONNECTING
+            EyeState.CONNECTING -> EyeState.CONNECTED
+            EyeState.CONNECTED -> EyeState.CLOSED
+        }
+        setEyeState(next, animate = true)
     }
 
     fun setEyeState(newState: EyeState, animate: Boolean = true) {
@@ -133,14 +147,14 @@ class CodeEyeView @JvmOverloads constructor(
                 val maxSandHeight = height * 0.38f
                 for (grain in sandGrains) {
                     grain.y += grain.speed * dt
-                    if (Random.nextFloat() < 0.18f) {
+                    if (Random.nextFloat() < 0.15f) {
                         grain.digit = digits.random()
                     }
                     if (grain.y > maxSandHeight) {
                         grain.y = 0f
-                        grain.xRatio = Random.nextFloat() * 0.72f - 0.36f
-                        grain.speed = Random.nextFloat() * 95f + 75f
-                        grain.alpha = Random.nextInt(110, 245)
+                        grain.xRatio = Random.nextFloat() * 0.7f - 0.35f
+                        grain.speed = Random.nextFloat() * 90f + 70f
+                        grain.alpha = Random.nextInt(100, 240)
                     }
                 }
                 invalidate()
@@ -165,7 +179,7 @@ class CodeEyeView @JvmOverloads constructor(
         if (width == 0 || height == 0) return
 
         val centerX = width / 2f
-        val eyeCenterY = height * 0.36f
+        val eyeCenterY = height * 0.38f
         val eyeWidth = width * 0.36f
         val maxLidHeight = height * 0.14f * openProgress.coerceAtLeast(0.08f)
 
@@ -192,6 +206,7 @@ class CodeEyeView @JvmOverloads constructor(
 
                 when {
                     currentState == EyeState.CONNECTED && distFromCenter < 0.42 -> {
+                        pupilPaint.color = colorPupilGreen
                         pupilPaint.alpha = 255
                         val glyph = if (distFromCenter < 0.2) '#' else '*'
                         canvas.drawText(glyph.toString(), x, y, pupilPaint)
@@ -202,15 +217,19 @@ class CodeEyeView @JvmOverloads constructor(
                         eyePaint.color = if (currentState == EyeState.CONNECTING) {
                             Color.argb(230, (80 + pulse * 120).toInt(), 255, (120 + pulse * 100).toInt())
                         } else {
-                            Color.parseColor("#E0F2F1")
+                            colorOpenEye
                         }
                         canvas.drawText("o", x, y, eyePaint)
                     }
 
                     abs(abs(rowNorm) - 1f) < 0.28f || (openProgress < 0.25f && r == 0) -> {
-                        eyePaint.color = Color.parseColor("#90A4AE")
+                        eyePaint.color = colorLid
                         eyePaint.alpha = 230
-                        val ch = if (openProgress < 0.25f && r == 0) '-' else codeChars[(abs(r * 7 + c * 13)) % codeChars.size]
+                        val ch = if (openProgress < 0.25f && r == 0) {
+                            '-'
+                        } else {
+                            codeChars[(abs(r * 7 + c * 13)) % codeChars.size]
+                        }
                         canvas.drawText(ch.toString(), x, y, eyePaint)
                     }
                 }
@@ -223,6 +242,7 @@ class CodeEyeView @JvmOverloads constructor(
                 val gx = centerX + grain.xRatio * eyeWidth
                 val gy = startY + grain.y
                 val fade = (1f - (grain.y / (height * 0.38f))).coerceIn(0.15f, 1f)
+                sandPaint.color = colorSandGreen
                 sandPaint.alpha = (grain.alpha * fade).toInt().coerceIn(20, 255)
                 canvas.drawText(grain.digit.toString(), gx, gy, sandPaint)
             }

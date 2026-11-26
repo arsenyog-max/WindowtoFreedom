@@ -447,7 +447,7 @@ class CodeEyeView @JvmOverloads constructor(
             }
         }
     }
-
+    
     private fun drawCodeStream(
         canvas: Canvas,
         centerX: Float,
@@ -544,4 +544,193 @@ class CodeEyeView @JvmOverloads constructor(
                 shadowPaint.color = colorShadowMid
                 shadowPaint.alpha = (165f * closedWeight * arch).toInt().coerceIn(40, 185)
                 val underIdx = (c * 5 + 2) % closedLineGlyphs.size
-                canvas.drawText(closedLineGlyphs[underIdx],
+                canvas.drawText(closedLineGlyphs[underIdx], x, underShadowY, shadowPaint)
+            }
+
+            lidPaint.color = when {
+                abs(colNorm) > 0.92f -> colorShadowDeep
+                abs(colNorm) < 0.28f -> colorHighlightWarm
+                else -> colorLidWarm
+            }
+            lidPaint.alpha = (245f * closedWeight).toInt().coerceIn(70, 255)
+            val closedGlyph = when {
+                abs(colNorm) > 0.94f && colNorm < 0f -> "<"
+                abs(colNorm) > 0.94f -> ">"
+                arch > 0.55f -> closedLineGlyphs[c % closedLineGlyphs.size]
+                else -> "-"
+            }
+            canvas.drawText(closedGlyph, x, lidLineY, lidPaint)
+
+            if (arch > 0.12f) {
+                val lashX = x + colNorm * charSize * 0.36f
+                val lashY = lidLineY + charSize * (0.88f + arch * 0.4f)
+                lashPaint.color = if (c % 3 == 0) colorShadowDeep else colorShadowMid
+                lashPaint.alpha = (195f * closedWeight * arch).toInt().coerceIn(55, 230)
+                val lashGlyph = if (colNorm > 0.24f) "/" else "|"
+                canvas.drawText(lashGlyph, lashX, lashY, lashPaint)
+            }
+        }
+    }
+
+    private fun drawOpenEye(
+        canvas: Canvas,
+        centerX: Float,
+        eyeCenterY: Float,
+        eyeHalfWidth: Float,
+        maxUpperLid: Float,
+        maxLowerLid: Float,
+        pupilNormOffsetX: Float,
+        charSize: Float,
+        eyeVisibility: Float,
+        cols: Int,
+        rows: Int
+    ) {
+        val isActiveEye = currentState == EyeState.CONNECTING || currentState == EyeState.CONNECTED
+
+        for (r in -rows / 2..rows / 2) {
+            val rowNorm = r / (rows / 2f)
+            for (c in -cols / 2..cols / 2) {
+                val colNorm = c / (cols / 2f)
+                val almondFactor = (1f - abs(colNorm).pow(1.65f)).coerceAtLeast(0f)
+                if (almondFactor <= 0.02f && abs(colNorm) < 0.96f) continue
+
+                val x = centerX + colNorm * eyeHalfWidth
+                val y = if (rowNorm < 0f) {
+                    eyeCenterY + rowNorm * maxUpperLid * almondFactor
+                } else {
+                    eyeCenterY + rowNorm * maxLowerLid * almondFactor
+                }
+
+                val isUpperBorder = r == -rows / 2 && almondFactor > 0.1f
+                val isLowerBorder = r == rows / 2 && almondFactor > 0.15f
+                if (isUpperBorder && eyeVisibility > 0.12f) {
+                    val lashSlope = -colNorm * 0.5f
+                    val lashX = x + lashSlope * charSize * 0.55f
+                    val lashY = y - charSize * (0.72f + 0.42f * almondFactor)
+                    lashPaint.color = if (c % 2 == 0) colorShadowMid else colorScleraBright
+                    lashPaint.alpha = (165f + 90f * eyeVisibility).toInt().coerceIn(100, 255)
+                    val lashGlyph = if (colNorm > 0.2f) "/" else "|"
+                    canvas.drawText(lashGlyph, lashX, lashY, lashPaint)
+                } else if (isLowerBorder && eyeVisibility > 0.35f) {
+                    val lashY = y + charSize * 0.64f
+                    lashPaint.color = colorShadowMid
+                    lashPaint.alpha = (150f * eyeVisibility).toInt().coerceIn(70, 190)
+                    canvas.drawText(lashGlyphs[abs(c) % lashGlyphs.size], x, lashY, lashPaint)
+                }
+
+                val onLidEdge = eyeVisibility >= 0.2f && abs(abs(rowNorm) - 1f) < 0.15f
+                if (onLidEdge) {
+                    lidPaint.color = if (rowNorm < 0f) colorLidWarm else colorShadowMid
+                    lidPaint.alpha = 245
+                    val chIdx = (abs(r * 5 + c * 11)) % openLidGlyphs.size
+                    canvas.drawText(openLidGlyphs[chIdx], x, y, lidPaint)
+                    continue
+                }
+
+                if (eyeVisibility > 0.22f && abs(rowNorm) < 0.94f) {
+                    val verticalScale = if (rowNorm < 0f) maxUpperLid else maxLowerLid
+                    val vNorm = if (verticalScale > 1f) {
+                        abs(y - eyeCenterY) / verticalScale
+                    } else {
+                        1f
+                    }
+                    val dx = (colNorm - pupilNormOffsetX) * 1.15
+                    val dy = vNorm * 1.15
+                    val irisDist = hypot(dx, dy)
+
+                    if (irisDist < 0.17) {
+                        pupilPaint.color = colorPupilGreen
+                        pupilPaint.alpha = 255
+                        val pIdx = (abs(r * 3 + c * 7)) % pupilGlyphs.size
+                        canvas.drawText(pupilGlyphs[pIdx], x, y, pupilPaint)
+                    } else if (irisDist < 0.38) {
+                        val pulse = ((sin(System.nanoTime() / 2.2e8) + 1.0) * 0.5).toFloat()
+                        irisPaint.color = if (isActiveEye) colorIrisGlow else colorIrisEmerald
+                        irisPaint.alpha = (200f + pulse * 55f).toInt().coerceIn(175, 255)
+                        val iIdx = (abs(r * 11 + c * 3)) % irisGlyphs.size
+                        canvas.drawText(irisGlyphs[iIdx], x, y, irisPaint)
+                    } else {
+                        val minX = pupilNormOffsetX - 0.19f
+                        val maxX = pupilNormOffsetX - 0.04f
+                        val inHighlightX = colNorm >= minX && colNorm <= maxX
+                        val inHighlightY = rowNorm >= -0.58f && rowNorm <= -0.18f
+                        if (inHighlightX && inHighlightY) {
+                            scleraPaint.color = colorHighlightWarm
+                            scleraPaint.alpha = 255
+                            canvas.drawText("#", x, y, scleraPaint)
+                        } else {
+                            val edgeShadow = abs(colNorm) > 0.68f || abs(rowNorm) > 0.72f
+                            scleraPaint.color = if (edgeShadow) colorShadowMid else colorScleraBright
+                            scleraPaint.alpha = (220f * eyeVisibility).toInt().coerceIn(110, 250)
+                            val sIdx = (abs(r * 7 + c * 5)) % scleraGlyphs.size
+                            canvas.drawText(scleraGlyphs[sIdx], x, y, scleraPaint)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        if (width == 0 || height == 0) return
+
+        val centerX = width / 2f
+        val eyeCenterY = height * 0.30f
+        val eyeHalfWidth = width * 0.42f
+
+        val upperFactor = (openProgress * 1.08f).coerceIn(0f, 1.15f)
+        val lowerFactor = (openProgress * 0.72f).coerceIn(0f, 0.8f)
+
+        val maxUpperLid = height * 0.145f * upperFactor.coerceAtLeast(0.02f)
+        val maxLowerLid = height * 0.10f * lowerFactor.coerceAtLeast(0.015f)
+
+        val pupilNormOffsetX = computeScanOffsetX()
+
+        val charSize = (width * 0.021f).coerceIn(12.5f, 22f)
+        shadowPaint.textSize = charSize * 0.9f
+        lidPaint.textSize = charSize
+        lashPaint.textSize = charSize * 0.85f
+        scleraPaint.textSize = charSize * 0.96f
+        irisPaint.textSize = charSize * 1.04f
+        pupilPaint.textSize = charSize * 1.15f
+        streamPaint.textSize = charSize * 0.88f
+
+        val eyeVisibility = ((openProgress + 0.08f) / 1.08f).coerceIn(0f, 1f)
+        val maxStreamDrop = (height * 0.56f).coerceAtLeast(160f)
+
+        val rawTgY = eyeCenterY + maxLowerLid + charSize * 11.5f
+        val maxTgY = height - charSize * 9.5f
+        val minTgY = eyeCenterY + charSize * 6.5f
+        val clampedTgY = rawTgY.coerceAtMost(maxTgY)
+        val tgCenterY = clampedTgY.coerceAtLeast(minTgY)
+        updateTelegramBounds(centerX, tgCenterY, charSize)
+
+        drawCodeStream(canvas, centerX, eyeCenterY, eyeHalfWidth, maxLowerLid, charSize, maxStreamDrop)
+        drawNumericTelegramIcon(canvas, centerX, tgCenterY, charSize)
+
+        val cols = 39
+        val rows = 23
+
+        drawUnderEyeShadows(canvas, centerX, eyeCenterY, eyeHalfWidth, maxLowerLid, charSize, cols)
+
+        if (eyeVisibility < 0.25f) {
+            val closedWeight = (1f - eyeVisibility / 0.25f).coerceIn(0f, 1f)
+            drawClosedEye(canvas, centerX, eyeCenterY, eyeHalfWidth, charSize, closedWeight, cols)
+        }
+
+        drawOpenEye(
+            canvas,
+            centerX,
+            eyeCenterY,
+            eyeHalfWidth,
+            maxUpperLid,
+            maxLowerLid,
+            pupilNormOffsetX,
+            charSize,
+            eyeVisibility,
+            cols,
+            rows
+        )
+    }
+}

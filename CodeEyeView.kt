@@ -179,7 +179,8 @@ class CodeEyeView @JvmOverloads constructor(
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                if (!telegramBounds.isEmpty && telegramBounds.contains(event.x, event.y)) {
+                val hitDown = !telegramBounds.isEmpty && telegramBounds.contains(event.x, event.y)
+                if (hitDown) {
                     touchDownOnTelegram = true
                     return true
                 }
@@ -188,7 +189,8 @@ class CodeEyeView @JvmOverloads constructor(
             MotionEvent.ACTION_UP -> {
                 if (touchDownOnTelegram) {
                     touchDownOnTelegram = false
-                    if (!telegramBounds.isEmpty && telegramBounds.contains(event.x, event.y)) {
+                    val hitUp = !telegramBounds.isEmpty && telegramBounds.contains(event.x, event.y)
+                    if (hitUp) {
                         isTelegramActive = !isTelegramActive
                         invalidate()
                         performClick()
@@ -470,9 +472,11 @@ class CodeEyeView @JvmOverloads constructor(
         val eyeVisibility = ((openProgress + 0.08f) / 1.08f).coerceIn(0f, 1f)
         val maxStreamDrop = (height * 0.56f).coerceAtLeast(160f)
 
-        val tgCenterY = (eyeCenterY + maxLowerLid + charSize * 11.5f)
-            .coerceAtMost(height - charSize * 9.5f)
-            .coerceAtLeast(eyeCenterY + charSize * 6.5f)
+        val rawTgY = eyeCenterY + maxLowerLid + charSize * 11.5f
+        val maxTgY = height - charSize * 9.5f
+        val minTgY = eyeCenterY + charSize * 6.5f
+        val tgCenterY = rawTgY.coerceAtMost(maxTgY).coerceAtLeast(minTgY)
+
         val tgCharSize = (charSize * 0.86f).coerceIn(11f, 20f)
         val tgHalfW = (telegramMask[0].length - 1) * (tgCharSize * 0.72f) * 0.5f + tgCharSize * 0.8f
         val tgHalfH = (telegramMask.size - 1) * (tgCharSize * 1.05f) * 0.5f + tgCharSize * 0.7f
@@ -491,7 +495,8 @@ class CodeEyeView @JvmOverloads constructor(
             val lowerCurveFactor = (1f - abs(eyeColNorm).pow(1.65f)).coerceAtLeast(0f)
             val lowerContourY = eyeCenterY + maxLowerLid * lowerCurveFactor
             val gy = lowerContourY + charSize * 1.15f + grain.y
-            if (gy > height - charSize * 0.3f) continue
+            val maxGy = height - charSize * 0.3f
+            if (gy > maxGy) continue
 
             val gx = deflectAroundTelegram(rawX, gy, deflectMargin)
 
@@ -539,6 +544,4 @@ class CodeEyeView @JvmOverloads constructor(
                         val upY = lidLineY - layer * charSize * 0.48f
                         if (layer == 3) {
                             shadowPaint.color = colorShadowDeep
-                            shadowPaint.alpha = (160f * closedWeight * arch).toInt().coerceIn(35, 185)
-                            val gIdx = (c * 5 + layer) % closedLineGlyphs.size
-   
+                      

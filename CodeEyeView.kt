@@ -96,119 +96,8 @@ class CodeEyeView @JvmOverloads constructor(
     private val irisGlyphs = arrayOf("#", "@", "%", "&", "+", "=", "/")
     private val pupilGlyphs = arrayOf("@", "#", "0", "%", "&")
     private val streamGlyphs = arrayOf(
-        "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
-        "/", ":", ";", "=", "-", "+", "*", "%", "#"
-    )
-    private val numericGlyphs = arrayOf("0", "1", "2", "3", "4", "5", "6", "7", "8", "9")
-
-    private val telegramMask = arrayOf(
-        "..........................##",
-        ".......................#####",
-        "....................########",
-        ".................###########",
-        "..............##############",
-        "...........#################",
-        "........####################",
-        ".....##########...##########",
-        "..############.....#########",
-        "#############.......########",
-        ".##########..........#######",
-        "....######............######",
-        ".......###.............#####",
-        "..........#.............####",
-        "........................####",
-        ".........................###",
-        "..........................##"
-    )
-
-    private var openAnimator: ValueAnimator? = null
-    private var streamAnimator: ValueAnimator? = null
-    private var lastFrameTime: Long = 0L
-
-    private val scanDurationSec: Float = 1.6f
-    private var scanElapsedSec: Float = scanDurationSec
-
-    init {
-        isClickable = true
-        isFocusable = true
-
-        shadowPaint.typeface = Typeface.MONOSPACE
-        shadowPaint.textAlign = Paint.Align.CENTER
-        shadowPaint.color = colorShadowDeep
-
-        lidPaint.typeface = Typeface.MONOSPACE
-        lidPaint.textAlign = Paint.Align.CENTER
-        lidPaint.color = colorLidWarm
-
-        lashPaint.typeface = Typeface.MONOSPACE
-        lashPaint.textAlign = Paint.Align.CENTER
-        lashPaint.color = colorShadowMid
-
-        scleraPaint.typeface = Typeface.MONOSPACE
-        scleraPaint.textAlign = Paint.Align.CENTER
-        scleraPaint.color = colorScleraBright
-
-        irisPaint.typeface = Typeface.MONOSPACE
-        irisPaint.textAlign = Paint.Align.CENTER
-        irisPaint.color = colorIrisEmerald
-
-        pupilPaint.typeface = Typeface.MONOSPACE
-        pupilPaint.textAlign = Paint.Align.CENTER
-        pupilPaint.color = colorPupilGreen
-
-        streamPaint.typeface = Typeface.MONOSPACE
-        streamPaint.textAlign = Paint.Align.CENTER
-        streamPaint.color = colorLidWarm
-
-        telegramPaint.typeface = Typeface.MONOSPACE
-        telegramPaint.textAlign = Paint.Align.CENTER
-        telegramPaint.color = colorTgGrayMain
-
-        initStream()
-        startStreamLoop()
-    }
-
-    fun setTelegramActive(active: Boolean) {
-        if (isTelegramActive == active) return
-        isTelegramActive = active
-        invalidate()
-    }
-
-    fun isTelegramActive(): Boolean = isTelegramActive
-
-    override fun onTouchEvent(event: MotionEvent): Boolean {
-        when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                val hitDown = !telegramBounds.isEmpty && telegramBounds.contains(event.x, event.y)
-                if (hitDown) {
-                    touchDownOnTelegram = true
-                    return true
-                }
-                touchDownOnTelegram = false
-            }
-            MotionEvent.ACTION_UP -> {
-                if (touchDownOnTelegram) {
-                    touchDownOnTelegram = false
-                    val hitUp = !telegramBounds.isEmpty && telegramBounds.contains(event.x, event.y)
-                    if (hitUp) {
-                        isTelegramActive = !isTelegramActive
-                        invalidate()
-                        performClick()
-                        return true
-                    }
-                }
-            }
-            MotionEvent.ACTION_CANCEL -> {
-                touchDownOnTelegram = false
-            }
-        }
-        return super.onTouchEvent(event)
-    }
-
-    override fun performClick(): Boolean {
-        return super.performClick()
-    }
-    
+        "0", "1
+        
     private fun pickEyeColorIndex(): Int {
         val roll = Random.nextFloat()
         return when (currentState) {
@@ -326,8 +215,89 @@ class CodeEyeView @JvmOverloads constructor(
         val t = (scanElapsedSec / scanDurationSec).coerceIn(0f, 1f)
         val angle = 2.0 * PI * t.toDouble()
         val wave = (-sin(angle)).toFloat() * (1f - t * 0.35f)
-        return (wave * 0.38f).coerceIn(-0.42f, 0.4
+        return (wave * 0.38f).coerceIn(-0.42f, 0.42f)
+    }
 
+    private fun startStreamLoop() {
+        if (streamAnimator?.isRunning == true) return
+        lastFrameTime = System.nanoTime()
+        val animator = ValueAnimator.ofFloat(0f, 1f)
+        animator.duration = 1000L
+        animator.repeatCount = ValueAnimator.INFINITE
+        animator.interpolator = LinearInterpolator()
+        animator.addUpdateListener {
+            val now = System.nanoTime()
+            val dt = ((now - lastFrameTime) / 1_000_000_000f).coerceIn(0.001f, 0.05f)
+            lastFrameTime = now
+
+            if (currentState == EyeState.CONNECTING && scanElapsedSec < scanDurationSec) {
+                scanElapsedSec = (scanElapsedSec + dt).coerceAtMost(scanDurationSec)
+            }
+
+            val streamAreaHeight = (height * 0.65f).coerceAtLeast(160f)
+            for (grain in codeGrains) {
+                grain.y += grain.speed * dt
+                if (Random.nextFloat() < 0.16f) {
+                    grain.glyph = streamGlyphs[Random.nextInt(streamGlyphs.size)]
+                    if (Random.nextFloat() < 0.25f) {
+                        grain.colorIndex = pickEyeColorIndex()
+                    }
+                }
+                if (grain.y > streamAreaHeight) {
+                    resetGrain(grain, randomY = false)
+                }
+            }
+            invalidate()
+        }
+        animator.start()
+        streamAnimator = animator
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        startStreamLoop()
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        openAnimator?.cancel()
+        streamAnimator?.cancel()
+        streamAnimator = null
+    }
+
+    private fun deflectAroundTelegram(x: Float, y: Float, margin: Float): Float {
+        if (telegramBounds.isEmpty) return x
+        val leftBound = telegramBounds.left - margin
+        val topBound = telegramBounds.top - margin * 0.65f
+        val rightBound = telegramBounds.right + margin
+        val bottomBound = telegramBounds.bottom + margin * 0.65f
+
+        val insideX = x >= leftBound && x <= rightBound
+        val insideY = y >= topBound && y <= bottomBound
+        if (!insideX || !insideY) return x
+
+        val tgCenterX = telegramBounds.centerX()
+        val pad = margin * 0.35f
+        return if (x <= tgCenterX) {
+            leftBound - pad
+        } else {
+            rightBound + pad
+        }
+    }
+
+    private fun updateTelegramBounds(centerX: Float, tgCenterY: Float, charSize: Float) {
+        val tgCharSize = (charSize * 0.86f).coerceIn(11f, 20f)
+        val stepX = tgCharSize * 0.86f
+        val stepY = tgCharSize * 0.84f
+        val tgHalfW = (telegramMask[0].length - 1) * stepX * 0.5f + tgCharSize * 0.8f
+        val tgHalfH = (telegramMask.size - 1) * stepY * 0.5f + tgCharSize * 0.7f
+        telegramBounds.set(
+            centerX - tgHalfW,
+            tgCenterY - tgHalfH,
+            centerX + tgHalfW,
+            tgCenterY + tgHalfH
+        )
+    }
     private fun drawNumericTelegramIcon(canvas: Canvas, centerX: Float, centerY: Float, charSize: Float) {
         val tgCharSize = (charSize * 0.86f).coerceIn(11f, 20f)
         telegramPaint.textSize = tgCharSize
@@ -651,4 +621,5 @@ class CodeEyeView @JvmOverloads constructor(
             rows
         )
     }
-}
+        }
+        

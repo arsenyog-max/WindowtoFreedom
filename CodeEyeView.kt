@@ -396,6 +396,20 @@ class CodeEyeView @JvmOverloads constructor(
         }
     }
 
+    private fun updateTelegramBounds(centerX: Float, tgCenterY: Float, charSize: Float) {
+        val tgCharSize = (charSize * 0.86f).coerceIn(11f, 20f)
+        val stepX = tgCharSize * 0.72f
+        val stepY = tgCharSize * 1.05f
+        val tgHalfW = (telegramMask[0].length - 1) * stepX * 0.5f + tgCharSize * 0.8f
+        val tgHalfH = (telegramMask.size - 1) * stepY * 0.5f + tgCharSize * 0.7f
+        telegramBounds.set(
+            centerX - tgHalfW,
+            tgCenterY - tgHalfH,
+            centerX + tgHalfW,
+            tgCenterY + tgHalfH
+        )
+    }
+
     private fun drawNumericTelegramIcon(canvas: Canvas, centerX: Float, centerY: Float, charSize: Float) {
         val tgCharSize = (charSize * 0.86f).coerceIn(11f, 20f)
         telegramPaint.textSize = tgCharSize
@@ -410,23 +424,15 @@ class CodeEyeView @JvmOverloads constructor(
         val startX = centerX - totalWidth * 0.5f
         val startY = centerY - totalHeight * 0.5f
 
-        telegramBounds.set(
-            startX - stepX * 0.8f,
-            startY - tgCharSize * 0.9f,
-            startX + totalWidth + stepX * 0.8f,
-            startY + totalHeight + tgCharSize * 0.35f
-        )
-
         val mainColor = if (isTelegramActive) colorTgBlueMain else colorTgGrayMain
         val darkColor = if (isTelegramActive) colorTgBlueDark else colorTgGrayDark
+        val activeShift = if (isTelegramActive) 2 else 0
 
         for (r in 0 until numRows) {
             val rowStr = telegramMask[r]
             val py = startY + r * stepY
             for (c in 0 until numCols) {
-                val cell = rowStr[c]
-                if (cell != '#') continue
-
+                if (rowStr[c] != '#') continue
                 val px = startX + c * stepX
                 val foldRow = r >= 8 && r <= 16
                 val foldColA = c >= 6 && c <= 11
@@ -436,58 +442,24 @@ class CodeEyeView @JvmOverloads constructor(
                 telegramPaint.color = if (isShadowFold) darkColor else mainColor
                 telegramPaint.alpha = if (isShadowFold) 215 else 255
 
-                val activeShift = if (isTelegramActive) 2 else 0
                 val digitIdx = (r * 7 + c * 3 + activeShift) % numericGlyphs.size
-                val digitText = numericGlyphs[digitIdx]
-                canvas.drawText(digitText, px, py, telegramPaint)
+                canvas.drawText(numericGlyphs[digitIdx], px, py, telegramPaint)
             }
         }
     }
 
-    override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
-        if (width == 0 || height == 0) return
-
-        val centerX = width / 2f
-        val eyeCenterY = height * 0.30f
-        val eyeHalfWidth = width * 0.42f
-
-        val upperFactor = (openProgress * 1.08f).coerceIn(0f, 1.15f)
-        val lowerFactor = (openProgress * 0.72f).coerceIn(0f, 0.8f)
-
-        val maxUpperLid = height * 0.145f * upperFactor.coerceAtLeast(0.02f)
-        val maxLowerLid = height * 0.10f * lowerFactor.coerceAtLeast(0.015f)
-
-        val pupilNormOffsetX = computeScanOffsetX()
-
-        val charSize = (width * 0.021f).coerceIn(12.5f, 22f)
-        shadowPaint.textSize = charSize * 0.9f
-        lidPaint.textSize = charSize
-        lashPaint.textSize = charSize * 0.85f
-        scleraPaint.textSize = charSize * 0.96f
-        irisPaint.textSize = charSize * 1.04f
-        pupilPaint.textSize = charSize * 1.15f
-        streamPaint.textSize = charSize * 0.88f
-
-        val eyeVisibility = ((openProgress + 0.08f) / 1.08f).coerceIn(0f, 1f)
-        val maxStreamDrop = (height * 0.56f).coerceAtLeast(160f)
-
-        val rawTgY = eyeCenterY + maxLowerLid + charSize * 11.5f
-        val maxTgY = height - charSize * 9.5f
-        val minTgY = eyeCenterY + charSize * 6.5f
-        val tgCenterY = rawTgY.coerceAtMost(maxTgY).coerceAtLeast(minTgY)
-
-        val tgCharSize = (charSize * 0.86f).coerceIn(11f, 20f)
-        val tgHalfW = (telegramMask[0].length - 1) * (tgCharSize * 0.72f) * 0.5f + tgCharSize * 0.8f
-        val tgHalfH = (telegramMask.size - 1) * (tgCharSize * 1.05f) * 0.5f + tgCharSize * 0.7f
-        telegramBounds.set(
-            centerX - tgHalfW,
-            tgCenterY - tgHalfH,
-            centerX + tgHalfW,
-            tgCenterY + tgHalfH
-        )
-
+    private fun drawCodeStream(
+        canvas: Canvas,
+        centerX: Float,
+        eyeCenterY: Float,
+        eyeHalfWidth: Float,
+        maxLowerLid: Float,
+        charSize: Float,
+        maxStreamDrop: Float
+    ) {
         val deflectMargin = charSize * 2.2f
+        val maxGy = height - charSize * 0.3f
+
         for (grain in codeGrains) {
             if (grain.y > maxStreamDrop) continue
             val rawX = centerX + grain.xRatio * (width * 0.46f)
@@ -495,11 +467,9 @@ class CodeEyeView @JvmOverloads constructor(
             val lowerCurveFactor = (1f - abs(eyeColNorm).pow(1.65f)).coerceAtLeast(0f)
             val lowerContourY = eyeCenterY + maxLowerLid * lowerCurveFactor
             val gy = lowerContourY + charSize * 1.15f + grain.y
-            val maxGy = height - charSize * 0.3f
             if (gy > maxGy) continue
 
             val gx = deflectAroundTelegram(rawX, gy, deflectMargin)
-
             val fade = (1f - (grain.y / maxStreamDrop) * 0.6f).coerceIn(0.3f, 1f)
             val safeIdx = grain.colorIndex.coerceIn(0, eyePaletteColors.size - 1)
             val alphaFloat = grain.alpha * fade
@@ -507,41 +477,71 @@ class CodeEyeView @JvmOverloads constructor(
             streamPaint.alpha = alphaFloat.toInt().coerceIn(35, 255)
             canvas.drawText(grain.glyph, gx, gy, streamPaint)
         }
+    }
 
-        drawNumericTelegramIcon(canvas, centerX, tgCenterY, charSize)
-
-        val cols = 39
-        val rows = 23
-
+    private fun drawUnderEyeShadows(
+        canvas: Canvas,
+        centerX: Float,
+        eyeCenterY: Float,
+        eyeHalfWidth: Float,
+        maxLowerLid: Float,
+        charSize: Float,
+        cols: Int
+    ) {
         for (c in 0 until cols) {
             val colNorm = (c / (cols - 1f)) * 2f - 1f
             val arch = (1f - abs(colNorm).pow(1.65f)).coerceAtLeast(0f)
+            if (arch <= 0.08f) continue
+
             val x = centerX + colNorm * eyeHalfWidth
             val lowerEdgeY = eyeCenterY + maxLowerLid * arch
 
-            if (arch > 0.08f) {
-                for (rowIdx in 1..3) {
-                    val subY = lowerEdgeY + rowIdx * charSize * 0.48f
-                    val rowFade = (1f - (rowIdx - 1) * 0.28f) * arch
-                    shadowPaint.color = if (rowIdx == 1) colorUnderEyeShadow else colorShadowDeep
-                    shadowPaint.alpha = (165f * rowFade).toInt().coerceIn(35, 185)
-                    val gIdx = (c * 3 + rowIdx * 7) % underEyeGlyphs.size
-                    canvas.drawText(underEyeGlyphs[gIdx], x, subY, shadowPaint)
-                }
+            for (rowIdx in 1..3) {
+                val subY = lowerEdgeY + rowIdx * charSize * 0.48f
+                val rowFade = (1f - (rowIdx - 1) * 0.28f) * arch
+                shadowPaint.color = if (rowIdx == 1) colorUnderEyeShadow else colorShadowDeep
+                shadowPaint.alpha = (165f * rowFade).toInt().coerceIn(35, 185)
+                val gIdx = (c * 3 + rowIdx * 7) % underEyeGlyphs.size
+                canvas.drawText(underEyeGlyphs[gIdx], x, subY, shadowPaint)
             }
         }
+    }
 
-        if (eyeVisibility < 0.25f) {
-            val closedWeight = (1f - eyeVisibility / 0.25f).coerceIn(0f, 1f)
-            for (c in 0 until cols) {
-                val colNorm = (c / (cols - 1f)) * 2f - 1f
-                val arch = (1f - abs(colNorm).pow(1.75f)).coerceAtLeast(0f)
-                val x = centerX + colNorm * eyeHalfWidth
-                val lidLineY = eyeCenterY - arch * (charSize * 0.42f) + (colNorm * colNorm * charSize * 0.22f)
+    private fun drawClosedEye(
+        canvas: Canvas,
+        centerX: Float,
+        eyeCenterY: Float,
+        eyeHalfWidth: Float,
+        charSize: Float,
+        closedWeight: Float,
+        cols: Int
+    ) {
+        for (c in 0 until cols) {
+            val colNorm = (c / (cols - 1f)) * 2f - 1f
+            val arch = (1f - abs(colNorm).pow(1.75f)).coerceAtLeast(0f)
+            val x = centerX + colNorm * eyeHalfWidth
+            val lidLineY = eyeCenterY - arch * (charSize * 0.42f) + (colNorm * colNorm * charSize * 0.22f)
 
-                if (arch > 0.08f) {
-                    for (layer in 1..3) {
-                        val upY = lidLineY - layer * charSize * 0.48f
-                        if (layer == 3) {
-                            shadowPaint.color = colorShadowDeep
-                      
+            if (arch > 0.08f) {
+                for (layer in 1..3) {
+                    val upY = lidLineY - layer * charSize * 0.48f
+                    if (layer == 3) {
+                        shadowPaint.color = colorShadowDeep
+                        shadowPaint.alpha = (160f * closedWeight * arch).toInt().coerceIn(35, 185)
+                        val gIdx = (c * 5 + layer) % closedLineGlyphs.size
+                        canvas.drawText(closedLineGlyphs[gIdx], x, upY, shadowPaint)
+                    } else {
+                        val isHighlight = layer == 1 && abs(colNorm) < 0.35f
+                        lidPaint.color = if (isHighlight) colorHighlightWarm else colorLidWarm
+                        val layerAlpha = (215f - layer * 40f) * closedWeight * arch
+                        lidPaint.alpha = layerAlpha.toInt().coerceIn(45, 230)
+                        val gIdx = (c * 3 + layer * 4) % closedLineGlyphs.size
+                        canvas.drawText(closedLineGlyphs[gIdx], x, upY, lidPaint)
+                    }
+                }
+
+                val underShadowY = lidLineY + charSize * 0.44f
+                shadowPaint.color = colorShadowMid
+                shadowPaint.alpha = (165f * closedWeight * arch).toInt().coerceIn(40, 185)
+                val underIdx = (c * 5 + 2) % closedLineGlyphs.size
+                canvas.drawText(closedLineGlyphs[underIdx],

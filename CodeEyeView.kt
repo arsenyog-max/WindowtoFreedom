@@ -8,6 +8,7 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.util.AttributeSet
 import android.view.View
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.LinearInterpolator
 import android.view.animation.OvershootInterpolator
 import kotlin.math.PI
@@ -38,8 +39,17 @@ class CodeEyeView @JvmOverloads constructor(
     private val colorIrisEmerald = Color.parseColor("#00E676")
     private val colorIrisGlow = Color.parseColor("#69F0AE")
     private val colorPupilGreen = Color.parseColor("#00FF66")
-    private val colorCodeGray = Color.parseColor("#78909C")
-    private val colorCodeGreen = Color.parseColor("#00E676")
+
+    private val eyePaletteColors = intArrayOf(
+        colorLidWarm,
+        colorScleraBright,
+        colorHighlightWarm,
+        colorShadowMid,
+        colorUnderEyeShadow,
+        colorIrisEmerald,
+        colorIrisGlow,
+        colorPupilGreen
+    )
 
     private var currentState: EyeState = EyeState.CLOSED
     private var openProgress: Float = 0f
@@ -58,7 +68,7 @@ class CodeEyeView @JvmOverloads constructor(
         var speed: Float = 85f
         var glyph: String = "0"
         var alpha: Int = 180
-        var isGreenAccent: Boolean = false
+        var colorIndex: Int = 0
     }
 
     private val codeGrains = mutableListOf<CodeGrain>()
@@ -116,10 +126,46 @@ class CodeEyeView @JvmOverloads constructor(
 
         streamPaint.typeface = Typeface.MONOSPACE
         streamPaint.textAlign = Paint.Align.CENTER
-        streamPaint.color = colorCodeGray
+        streamPaint.color = colorLidWarm
 
         initStream()
         startStreamLoop()
+    }
+
+    private fun pickEyeColorIndex(): Int {
+        val roll = Random.nextFloat()
+        return when (currentState) {
+            EyeState.CLOSED -> when {
+                roll < 0.24f -> 0
+                roll < 0.44f -> 1
+                roll < 0.54f -> 2
+                roll < 0.72f -> 3
+                roll < 0.88f -> 4
+                roll < 0.94f -> 5
+                roll < 0.98f -> 6
+                else -> 7
+            }
+            EyeState.CONNECTING -> when {
+                roll < 0.16f -> 0
+                roll < 0.30f -> 1
+                roll < 0.38f -> 2
+                roll < 0.48f -> 3
+                roll < 0.56f -> 4
+                roll < 0.74f -> 5
+                roll < 0.88f -> 6
+                else -> 7
+            }
+            EyeState.CONNECTED -> when {
+                roll < 0.12f -> 0
+                roll < 0.22f -> 1
+                roll < 0.28f -> 2
+                roll < 0.35f -> 3
+                roll < 0.41f -> 4
+                roll < 0.65f -> 5
+                roll < 0.84f -> 6
+                else -> 7
+            }
+        }
     }
 
     private fun resetGrain(grain: CodeGrain, randomY: Boolean) {
@@ -127,8 +173,8 @@ class CodeEyeView @JvmOverloads constructor(
         grain.y = if (randomY) Random.nextFloat() * 920f else 0f
         grain.speed = Random.nextFloat() * 120f + 70f
         grain.glyph = streamGlyphs[Random.nextInt(streamGlyphs.size)]
-        grain.alpha = Random.nextInt(95, 240)
-        grain.isGreenAccent = Random.nextFloat() < 0.5f
+        grain.alpha = Random.nextInt(105, 245)
+        grain.colorIndex = pickEyeColorIndex()
     }
 
     private fun initStream() {
@@ -164,14 +210,29 @@ class CodeEyeView @JvmOverloads constructor(
             EyeState.CONNECTING, EyeState.CONNECTED -> 1f
         }
 
+        for (grain in codeGrains) {
+            if (Random.nextFloat() < 0.65f) {
+                grain.colorIndex = pickEyeColorIndex()
+            }
+        }
+
         openAnimator?.cancel()
         if (animate) {
+            val isClosing = targetOpen < openProgress
             openAnimator = ValueAnimator.ofFloat(openProgress, targetOpen)
-            openAnimator?.duration = 460L
-            openAnimator?.interpolator = OvershootInterpolator(0.55f)
+            openAnimator?.duration = if (isClosing) 340L else 460L
+            openAnimator?.interpolator = if (isClosing) {
+                AccelerateDecelerateInterpolator()
+            } else {
+                OvershootInterpolator(0.55f)
+            }
             openAnimator?.addUpdateListener { anim ->
                 val raw = anim.animatedValue as Float
-                openProgress = raw.coerceIn(-0.08f, 1.12f)
+                openProgress = if (isClosing) {
+                    raw.coerceIn(0f, 1f)
+                } else {
+                    raw.coerceIn(-0.08f, 1.12f)
+                }
                 invalidate()
             }
             openAnimator?.start()
@@ -212,8 +273,8 @@ class CodeEyeView @JvmOverloads constructor(
                 grain.y += grain.speed * dt
                 if (Random.nextFloat() < 0.16f) {
                     grain.glyph = streamGlyphs[Random.nextInt(streamGlyphs.size)]
-                    if (currentState == EyeState.CONNECTING && Random.nextFloat() < 0.3f) {
-                        grain.isGreenAccent = Random.nextFloat() < 0.5f
+                    if (Random.nextFloat() < 0.25f) {
+                        grain.colorIndex = pickEyeColorIndex()
                     }
                 }
                 if (grain.y > streamAreaHeight) {
@@ -266,8 +327,6 @@ class CodeEyeView @JvmOverloads constructor(
         val eyeVisibility = ((openProgress + 0.08f) / 1.08f).coerceIn(0f, 1f)
         val maxStreamDrop = (height * 0.48f).coerceAtLeast(140f)
 
-        // 1. Поток кода под нижней округлостью глаза:
-        // CLOSED -> серый; CONNECTING -> зелёный вперемешку с серым; CONNECTED -> зелёный
         for (grain in codeGrains) {
             if (grain.y > maxStreamDrop) continue
             val gx = centerX + grain.xRatio * (width * 0.46f)
@@ -278,19 +337,15 @@ class CodeEyeView @JvmOverloads constructor(
             if (gy > height - charSize * 0.3f) continue
 
             val fade = (1f - (grain.y / maxStreamDrop) * 0.65f).coerceIn(0.25f, 1f)
-            streamPaint.color = when (currentState) {
-                EyeState.CLOSED -> colorCodeGray
-                EyeState.CONNECTING -> if (grain.isGreenAccent) colorCodeGreen else colorCodeGray
-                EyeState.CONNECTED -> colorCodeGreen
-            }
-            streamPaint.alpha = (grain.alpha * fade).toInt().coerceIn(30, 255)
+            val safeIdx = grain.colorIndex.coerceIn(0, eyePaletteColors.size - 1)
+            streamPaint.color = eyePaletteColors[safeIdx]
+            streamPaint.alpha = (grain.alpha * fade).toInt().coerceIn(35, 255)
             canvas.drawText(grain.glyph, gx, gy, streamPaint)
         }
 
         val cols = 39
         val rows = 23
 
-        // 2. Плотная строчная текстура под глазом (тени и линии как на референсе)
         for (c in 0 until cols) {
             val colNorm = (c / (cols - 1f)) * 2f - 1f
             val arch = (1f - abs(colNorm).pow(1.65f)).coerceAtLeast(0f)
@@ -309,7 +364,6 @@ class CodeEyeView @JvmOverloads constructor(
             }
         }
 
-        // 3. Детализированный закрытый глаз (без брови) в плотной строчной манере
         if (eyeVisibility < 0.25f) {
             val closedWeight = (1f - eyeVisibility / 0.25f).coerceIn(0f, 1f)
             for (c in 0 until cols) {
@@ -319,7 +373,6 @@ class CodeEyeView @JvmOverloads constructor(
                 val lidLineY = eyeCenterY - arch * (charSize * 0.42f) + (colNorm * colNorm * charSize * 0.22f)
 
                 if (arch > 0.08f) {
-                    // Верхняя складка века и слои закрытого века
                     for (layer in 1..3) {
                         val upY = lidLineY - layer * charSize * 0.48f
                         if (layer == 3) {
@@ -336,7 +389,6 @@ class CodeEyeView @JvmOverloads constructor(
                         }
                     }
 
-                    // Тень под сомкнутым веком
                     val underShadowY = lidLineY + charSize * 0.44f
                     shadowPaint.color = colorShadowMid
                     shadowPaint.alpha = (165 * closedWeight * arch).toInt().coerceIn(40, 185)
@@ -368,7 +420,6 @@ class CodeEyeView @JvmOverloads constructor(
             }
         }
 
-        // 4. Открытый глаз: веки, ресницы, тёплая склера с бликами, зелёная радужка и зелёный зрачок
         val isActiveEye = currentState == EyeState.CONNECTING || currentState == EyeState.CONNECTED
 
         for (r in -rows / 2..rows / 2) {
@@ -438,20 +489,4 @@ class CodeEyeView @JvmOverloads constructor(
                         val maxX = pupilNormOffsetX - 0.04f
                         val inHighlightX = colNorm >= minX && colNorm <= maxX
                         val inHighlightY = rowNorm >= -0.58f && rowNorm <= -0.18f
-                        if (inHighlightX && inHighlightY) {
-                            scleraPaint.color = colorHighlightWarm
-                            scleraPaint.alpha = 255
-                            canvas.drawText("#", x, y, scleraPaint)
-                        } else {
-                            val edgeShadow = abs(colNorm) > 0.68f || abs(rowNorm) > 0.72f
-                            scleraPaint.color = if (edgeShadow) colorShadowMid else colorScleraBright
-                            scleraPaint.alpha = (220 * eyeVisibility).toInt().coerceIn(110, 250)
-                            val sGlyph = scleraGlyphs[(abs(r * 7 + c * 5)) % scleraGlyphs.size]
-                            canvas.drawText(sGlyph, x, y, scleraPaint)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
+                       

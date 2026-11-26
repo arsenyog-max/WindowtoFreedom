@@ -5,8 +5,10 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.RectF
 import android.graphics.Typeface
 import android.util.AttributeSet
+import android.view.MotionEvent
 import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.LinearInterpolator
@@ -40,6 +42,11 @@ class CodeEyeView @JvmOverloads constructor(
     private val colorIrisGlow = Color.parseColor("#69F0AE")
     private val colorPupilGreen = Color.parseColor("#00FF66")
 
+    private val colorTgGrayMain = Color.parseColor("#90A4AE")
+    private val colorTgGrayDark = Color.parseColor("#546E7A")
+    private val colorTgBlueMain = Color.parseColor("#29B6F6")
+    private val colorTgBlueDark = Color.parseColor("#0288D1")
+
     private val eyePaletteColors = intArrayOf(
         colorLidWarm,
         colorScleraBright,
@@ -53,6 +60,9 @@ class CodeEyeView @JvmOverloads constructor(
 
     private var currentState: EyeState = EyeState.CLOSED
     private var openProgress: Float = 0f
+    private var isTelegramActive: Boolean = false
+    private val telegramBounds = RectF()
+    private var touchDownOnTelegram: Boolean = false
 
     private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val lidPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -61,6 +71,7 @@ class CodeEyeView @JvmOverloads constructor(
     private val irisPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val pupilPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val streamPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val telegramPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
     private class CodeGrain {
         var xRatio: Float = 0f
@@ -87,6 +98,29 @@ class CodeEyeView @JvmOverloads constructor(
     private val streamGlyphs = arrayOf(
         "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
         "/", ":", ";", "=", "-", "+", "*", "%", "#"
+    )
+    private val numericGlyphs = arrayOf("0", "1", "2", "3", "4", "5", "6", "7", "8", "9")
+
+    // 17 строк x 17 столбцов: силуэт бумажного самолётика Telegram из числовых символов
+    // '#' — светлая плоскость крыла, '+' — излом/тень, '.' — нижний загиб/след
+    private val telegramMask = arrayOf(
+        "...............##",
+        ".............###.",
+        "...........####..",
+        ".........#####...",
+        ".......######....",
+        ".....#######.....",
+        "...########......",
+        ".#########.......",
+        "####..#####......",
+        "..##...#####.....",
+        "...##..#####.....",
+        "....##.#####.....",
+        ".....#######.....",
+        "......######.....",
+        ".......#####.....",
+        "........####.....",
+        ".........###....."
     )
 
     private var openAnimator: ValueAnimator? = null
@@ -128,8 +162,51 @@ class CodeEyeView @JvmOverloads constructor(
         streamPaint.textAlign = Paint.Align.CENTER
         streamPaint.color = colorLidWarm
 
+        telegramPaint.typeface = Typeface.MONOSPACE
+        telegramPaint.textAlign = Paint.Align.CENTER
+        telegramPaint.color = colorTgGrayMain
+
         initStream()
         startStreamLoop()
+    }
+
+    fun setTelegramActive(active: Boolean) {
+        if (isTelegramActive == active) return
+        isTelegramActive = active
+        invalidate()
+    }
+
+    fun isTelegramActive(): Boolean = isTelegramActive
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                if (!telegramBounds.isEmpty && telegramBounds.contains(event.x, event.y)) {
+                    touchDownOnTelegram = true
+                    return true
+                }
+                touchDownOnTelegram = false
+            }
+            MotionEvent.ACTION_UP -> {
+                if (touchDownOnTelegram) {
+                    touchDownOnTelegram = false
+                    if (!telegramBounds.isEmpty && telegramBounds.contains(event.x, event.y)) {
+                        isTelegramActive = !isTelegramActive
+                        invalidate()
+                        performClick()
+                        return true
+                    }
+                }
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                touchDownOnTelegram = false
+            }
+        }
+        return super.onTouchEvent(event)
+    }
+
+    override fun performClick(): Boolean {
+        return super.performClick()
     }
 
     private fun pickEyeColorIndex(): Int {
@@ -268,7 +345,7 @@ class CodeEyeView @JvmOverloads constructor(
                 scanElapsedSec = (scanElapsedSec + dt).coerceAtMost(scanDurationSec)
             }
 
-            val streamAreaHeight = (height * 0.6f).coerceAtLeast(140f)
+            val streamAreaHeight = (height * 0.65f).coerceAtLeast(160f)
             for (grain in codeGrains) {
                 grain.y += grain.speed * dt
                 if (Random.nextFloat() < 0.16f) {
@@ -299,19 +376,81 @@ class CodeEyeView @JvmOverloads constructor(
         streamAnimator = null
     }
 
+    private fun deflectAroundTelegram(x: Float, y: Float, margin: Float): Float {
+        if (telegramBounds.isEmpty) return x
+        val expanded = RectF(
+            telegramBounds.left - margin,
+            telegramBounds.top - margin * 0.65f,
+            telegramBounds.right + margin,
+            telegramBounds.bottom + margin * 0.65f
+        )
+        if (!expanded.contains(x, y)) return x
+
+        val tgCenterX = telegramBounds.centerX()
+        return if (x <= tgCenterX) {
+            expanded.left - charWidthPadding(margin)
+        } else {
+            expanded.right + charWidthPadding(margin)
+        }
+    }
+
+    private fun charWidthPadding(margin: Float): Float = margin * 0.35f
+
+    private fun drawNumericTelegramIcon(canvas: Canvas, centerX: Float, centerY: Float, charSize: Float) {
+        val tgCharSize = (charSize * 0.86f).coerceIn(11f, 20f)
+        telegramPaint.textSize = tgCharSize
+
+        val stepX = tgCharSize * 0.72f
+        val stepY = tgCharSize * 1.05f
+        val numRows = telegramMask.size
+        val numCols = telegramMask[0].length
+
+        val totalWidth = (numCols - 1) * stepX
+        val totalHeight = (numRows - 1) * stepY
+        val startX = centerX - totalWidth * 0.5f
+        val startY = centerY - totalHeight * 0.5f
+
+        telegramBounds.set(
+            startX - stepX * 0.8f,
+            startY - tgCharSize * 0.9f,
+            startX + totalWidth + stepX * 0.8f,
+            startY + totalHeight + tgCharSize * 0.35f
+        )
+
+        val mainColor = if (isTelegramActive) colorTgBlueMain else colorTgGrayMain
+        val darkColor = if (isTelegramActive) colorTgBlueDark else colorTgGrayDark
+
+        for (r in 0 until numRows) {
+            val rowStr = telegramMask[r]
+            val py = startY + r * stepY
+            for (c in 0 until numCols) {
+                val cell = rowStr[c]
+                if (cell != '#') continue
+
+                val px = startX + c * stepX
+                val isShadowFold = (r in 8..16 && c in 6..11) || (r in 8..10 && c in 2..5)
+                telegramPaint.color = if (isShadowFold) darkColor else mainColor
+                telegramPaint.alpha = if (isShadowFold) 215 else 255
+
+                val digitIdx = (r * 7 + c * 3 + (if (isTelegramActive) 2 else 0)) % numericGlyphs.size
+                canvas.drawText(numericGlyphs[digitIdx], px, py, telegramPaint)
+            }
+        }
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         if (width == 0 || height == 0) return
 
         val centerX = width / 2f
-        val eyeCenterY = height * 0.36f
+        val eyeCenterY = height * 0.30f
         val eyeHalfWidth = width * 0.42f
 
         val upperFactor = (openProgress * 1.08f).coerceIn(0f, 1.15f)
         val lowerFactor = (openProgress * 0.72f).coerceIn(0f, 0.8f)
 
-        val maxUpperLid = height * 0.16f * upperFactor.coerceAtLeast(0.02f)
-        val maxLowerLid = height * 0.11f * lowerFactor.coerceAtLeast(0.015f)
+        val maxUpperLid = height * 0.145f * upperFactor.coerceAtLeast(0.02f)
+        val maxLowerLid = height * 0.10f * lowerFactor.coerceAtLeast(0.015f)
 
         val pupilNormOffsetX = computeScanOffsetX()
 
@@ -325,24 +464,45 @@ class CodeEyeView @JvmOverloads constructor(
         streamPaint.textSize = charSize * 0.88f
 
         val eyeVisibility = ((openProgress + 0.08f) / 1.08f).coerceIn(0f, 1f)
-        val maxStreamDrop = (height * 0.48f).coerceAtLeast(140f)
+        val maxStreamDrop = (height * 0.56f).coerceAtLeast(160f)
 
+        // Заранее вычисляем позицию самолётика Telegram ниже глаза, чтобы поток цифр его обтекал
+        val tgCenterY = (eyeCenterY + maxLowerLid + charSize * 11.5f)
+            .coerceAtMost(height - charSize * 9.5f)
+            .coerceAtLeast(eyeCenterY + charSize * 6.5f)
+        val tgCharSize = (charSize * 0.86f).coerceIn(11f, 20f)
+        val tgHalfW = (telegramMask[0].length - 1) * (tgCharSize * 0.72f) * 0.5f + tgCharSize * 0.8f
+        val tgHalfH = (telegramMask.size - 1) * (tgCharSize * 1.05f) * 0.5f + tgCharSize * 0.7f
+        telegramBounds.set(
+            centerX - tgHalfW,
+            tgCenterY - tgHalfH,
+            centerX + tgHalfW,
+            tgCenterY + tgHalfH
+        )
+
+        // 1. Поток кода под глазом с обтеканием значка Telegram
+        val deflectMargin = charSize * 2.2f
         for (grain in codeGrains) {
             if (grain.y > maxStreamDrop) continue
-            val gx = centerX + grain.xRatio * (width * 0.46f)
-            val eyeColNorm = ((gx - centerX) / eyeHalfWidth).coerceIn(-1f, 1f)
+            val rawX = centerX + grain.xRatio * (width * 0.46f)
+            val eyeColNorm = ((rawX - centerX) / eyeHalfWidth).coerceIn(-1f, 1f)
             val lowerCurveFactor = (1f - abs(eyeColNorm).pow(1.65f)).coerceAtLeast(0f)
             val lowerContourY = eyeCenterY + maxLowerLid * lowerCurveFactor
             val gy = lowerContourY + charSize * 1.15f + grain.y
             if (gy > height - charSize * 0.3f) continue
 
-            val fade = (1f - (grain.y / maxStreamDrop) * 0.65f).coerceIn(0.25f, 1f)
+            val gx = deflectAroundTelegram(rawX, gy, deflectMargin)
+
+            val fade = (1f - (grain.y / maxStreamDrop) * 0.6f).coerceIn(0.3f, 1f)
             val safeIdx = grain.colorIndex.coerceIn(0, eyePaletteColors.size - 1)
             val alphaFloat = grain.alpha * fade
             streamPaint.color = eyePaletteColors[safeIdx]
             streamPaint.alpha = alphaFloat.toInt().coerceIn(35, 255)
             canvas.drawText(grain.glyph, gx, gy, streamPaint)
         }
+
+        // 2. Самолётик Telegram из числового кода (серый -> синий при нажатии)
+        drawNumericTelegramIcon(canvas, centerX, tgCenterY, charSize)
 
         val cols = 39
         val rows = 23
@@ -378,134 +538,4 @@ class CodeEyeView @JvmOverloads constructor(
                         val upY = lidLineY - layer * charSize * 0.48f
                         if (layer == 3) {
                             shadowPaint.color = colorShadowDeep
-                            shadowPaint.alpha = (160f * closedWeight * arch).toInt().coerceIn(35, 185)
-                            val gIdx = (c * 5 + layer) % closedLineGlyphs.size
-                            canvas.drawText(closedLineGlyphs[gIdx], x, upY, shadowPaint)
-                        } else {
-                            val isHighlight = layer == 1 && abs(colNorm) < 0.35f
-                            lidPaint.color = if (isHighlight) colorHighlightWarm else colorLidWarm
-                            val layerAlpha = (215f - layer * 40f) * closedWeight * arch
-                            lidPaint.alpha = layerAlpha.toInt().coerceIn(45, 230)
-                            val gIdx = (c * 3 + layer * 4) % closedLineGlyphs.size
-                            canvas.drawText(closedLineGlyphs[gIdx], x, upY, lidPaint)
-                        }
-                    }
-
-                    val underShadowY = lidLineY + charSize * 0.44f
-                    shadowPaint.color = colorShadowMid
-                    shadowPaint.alpha = (165f * closedWeight * arch).toInt().coerceIn(40, 185)
-                    val underIdx = (c * 5 + 2) % closedLineGlyphs.size
-                    canvas.drawText(closedLineGlyphs[underIdx], x, underShadowY, shadowPaint)
-                }
-
-                lidPaint.color = when {
-                    abs(colNorm) > 0.92f -> colorShadowDeep
-                    abs(colNorm) < 0.28f -> colorHighlightWarm
-                    else -> colorLidWarm
-                }
-                lidPaint.alpha = (245f * closedWeight).toInt().coerceIn(70, 255)
-                val closedGlyph = when {
-                    abs(colNorm) > 0.94f && colNorm < 0f -> "<"
-                    abs(colNorm) > 0.94f -> ">"
-                    arch > 0.55f -> closedLineGlyphs[c % closedLineGlyphs.size]
-                    else -> "-"
-                }
-                canvas.drawText(closedGlyph, x, lidLineY, lidPaint)
-
-                if (arch > 0.12f) {
-                    val lashX = x + colNorm * charSize * 0.36f
-                    val lashY = lidLineY + charSize * (0.88f + arch * 0.4f)
-                    lashPaint.color = if (c % 3 == 0) colorShadowDeep else colorShadowMid
-                    lashPaint.alpha = (195f * closedWeight * arch).toInt().coerceIn(55, 230)
-                    val lashGlyph = if (colNorm > 0.24f) "/" else "|"
-                    canvas.drawText(lashGlyph, lashX, lashY, lashPaint)
-                }
-            }
-        }
-
-        val isActiveEye = currentState == EyeState.CONNECTING || currentState == EyeState.CONNECTED
-
-        for (r in -rows / 2..rows / 2) {
-            val rowNorm = r / (rows / 2f)
-            for (c in -cols / 2..cols / 2) {
-                val colNorm = c / (cols / 2f)
-                val almondFactor = (1f - abs(colNorm).pow(1.65f)).coerceAtLeast(0f)
-                if (almondFactor <= 0.02f && abs(colNorm) < 0.96f) continue
-
-                val x = centerX + colNorm * eyeHalfWidth
-                val y = if (rowNorm < 0f) {
-                    eyeCenterY + rowNorm * maxUpperLid * almondFactor
-                } else {
-                    eyeCenterY + rowNorm * maxLowerLid * almondFactor
-                }
-
-                val isUpperBorder = r == -rows / 2 && almondFactor > 0.1f
-                val isLowerBorder = r == rows / 2 && almondFactor > 0.15f
-                if (isUpperBorder && eyeVisibility > 0.12f) {
-                    val lashSlope = -colNorm * 0.5f
-                    val lashX = x + lashSlope * charSize * 0.55f
-                    val lashY = y - charSize * (0.72f + 0.42f * almondFactor)
-                    lashPaint.color = if (c % 2 == 0) colorShadowMid else colorScleraBright
-                    lashPaint.alpha = (165f + 90f * eyeVisibility).toInt().coerceIn(100, 255)
-                    val lashGlyph = if (colNorm > 0.2f) "/" else "|"
-                    canvas.drawText(lashGlyph, lashX, lashY, lashPaint)
-                } else if (isLowerBorder && eyeVisibility > 0.35f) {
-                    val lashY = y + charSize * 0.64f
-                    lashPaint.color = colorShadowMid
-                    lashPaint.alpha = (150f * eyeVisibility).toInt().coerceIn(70, 190)
-                    canvas.drawText(lashGlyphs[abs(c) % lashGlyphs.size], x, lashY, lashPaint)
-                }
-
-                val onLidEdge = eyeVisibility >= 0.2f && abs(abs(rowNorm) - 1f) < 0.15f
-                if (onLidEdge) {
-                    lidPaint.color = if (rowNorm < 0f) colorLidWarm else colorShadowMid
-                    lidPaint.alpha = 245
-                    val chIdx = (abs(r * 5 + c * 11)) % openLidGlyphs.size
-                    canvas.drawText(openLidGlyphs[chIdx], x, y, lidPaint)
-                    continue
-                }
-
-                if (eyeVisibility > 0.22f && abs(rowNorm) < 0.94f) {
-                    val verticalScale = if (rowNorm < 0f) maxUpperLid else maxLowerLid
-                    val vNorm = if (verticalScale > 1f) {
-                        abs(y - eyeCenterY) / verticalScale
-                    } else {
-                        1f
-                    }
-                    val dx = (colNorm - pupilNormOffsetX) * 1.15
-                    val dy = vNorm * 1.15
-                    val irisDist = hypot(dx, dy)
-
-                    if (irisDist < 0.17) {
-                        pupilPaint.color = colorPupilGreen
-                        pupilPaint.alpha = 255
-                        val pIdx = (abs(r * 3 + c * 7)) % pupilGlyphs.size
-                        canvas.drawText(pupilGlyphs[pIdx], x, y, pupilPaint)
-                    } else if (irisDist < 0.38) {
-                        val pulse = ((sin(System.nanoTime() / 2.2e8) + 1.0) * 0.5).toFloat()
-                        irisPaint.color = if (isActiveEye) colorIrisGlow else colorIrisEmerald
-                        irisPaint.alpha = (200f + pulse * 55f).toInt().coerceIn(175, 255)
-                        val iIdx = (abs(r * 11 + c * 3)) % irisGlyphs.size
-                        canvas.drawText(irisGlyphs[iIdx], x, y, irisPaint)
-                    } else {
-                        val minX = pupilNormOffsetX - 0.19f
-                        val maxX = pupilNormOffsetX - 0.04f
-                        val inHighlightX = colNorm >= minX && colNorm <= maxX
-                        val inHighlightY = rowNorm >= -0.58f && rowNorm <= -0.18f
-                        if (inHighlightX && inHighlightY) {
-                            scleraPaint.color = colorHighlightWarm
-                            scleraPaint.alpha = 255
-                            canvas.drawText("#", x, y, scleraPaint)
-                        } else {
-                            val edgeShadow = abs(colNorm) > 0.68f || abs(rowNorm) > 0.72f
-                            scleraPaint.color = if (edgeShadow) colorShadowMid else colorScleraBright
-                            scleraPaint.alpha = (220f * eyeVisibility).toInt().coerceIn(110, 250)
-                            val sIdx = (abs(r * 7 + c * 5)) % scleraGlyphs.size
-                            canvas.drawText(scleraGlyphs[sIdx], x, y, scleraPaint)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
+                            sh

@@ -8,8 +8,8 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.util.AttributeSet
 import android.view.View
-import android.view.animation.DecelerateInterpolator
 import android.view.animation.LinearInterpolator
+import android.view.animation.OvershootInterpolator
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.hypot
@@ -29,9 +29,9 @@ class CodeEyeView @JvmOverloads constructor(
         CONNECTED
     }
 
-    private val colorBrow = Color.parseColor("#607D8B")
-    private val colorBrowActive = Color.parseColor("#80CBC4")
-    private val colorLid = Color.parseColor("#90A4AE")
+    private val colorCrease = Color.parseColor("#546E7A")
+    private val colorLid = Color.parseColor("#B0BEC5")
+    private val colorLidDark = Color.parseColor("#78909C")
     private val colorLash = Color.parseColor("#CFD8DC")
     private val colorSclera = Color.parseColor("#ECEFF1")
     private val colorIrisRing = Color.parseColor("#69F0AE")
@@ -43,10 +43,10 @@ class CodeEyeView @JvmOverloads constructor(
     private var currentState: EyeState = EyeState.CLOSED
     private var openProgress: Float = 0f
 
-    private val browPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val creasePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = Typeface.MONOSPACE
         textAlign = Paint.Align.CENTER
-        color = colorBrow
+        color = colorCrease
     }
 
     private val lidPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -94,8 +94,9 @@ class CodeEyeView @JvmOverloads constructor(
     )
 
     private val codeGrains = mutableListOf<CodeGrain>()
-    private val browChars = listOf('/', '\\', '|', '-', '~', '^', ';', ':')
-    private val lidChars = listOf('-', '=', '_', '/', '\\', ':', ';', '+')
+    private val creaseChars = listOf('.', '~', '-', '`')
+    private val closedLidChars = listOf('-', '=', '_', '~', '.', ':')
+    private val openLidChars = listOf('=', '-', '_', '/', '\\', ':', ';')
     private val lashChars = listOf('|', '/', '\\', '\'', '`')
     private val scleraChars = listOf('.', ':', ';', '+', '~')
     private val irisChars = listOf('%', '&', '+', '=', '/')
@@ -158,10 +159,11 @@ class CodeEyeView @JvmOverloads constructor(
         openAnimator?.cancel()
         if (animate) {
             openAnimator = ValueAnimator.ofFloat(openProgress, targetOpen).apply {
-                duration = 380L
-                interpolator = DecelerateInterpolator()
+                duration = 460L
+                // Живое естественное раскрытие с лёгким доворотом верхнего века
+                interpolator = OvershootInterpolator(0.55f)
                 addUpdateListener {
-                    openProgress = it.animatedValue as Float
+                    openProgress = (it.animatedValue as Float).coerceIn(-0.08f, 1.12f)
                     invalidate()
                 }
                 start()
@@ -233,53 +235,33 @@ class CodeEyeView @JvmOverloads constructor(
         if (width == 0 || height == 0) return
 
         val centerX = width / 2f
-        val eyeCenterY = height * 0.37f
+        val eyeCenterY = height * 0.36f
         val eyeHalfWidth = width * 0.38f
-        val maxUpperLid = height * 0.145f * openProgress.coerceAtLeast(0.05f)
-        val maxLowerLid = height * 0.10f * openProgress.coerceAtLeast(0.04f)
+
+        // Естественная асимметрия открытия: верхнее веко поднимается сильнее, нижнее — мягче
+        val upperFactor = (openProgress * 1.08f).coerceIn(0f, 1.15f)
+        val lowerFactor = (openProgress * 0.72f).coerceIn(0f, 0.8f)
+
+        val maxUpperLid = height * 0.155f * upperFactor.coerceAtLeast(0.02f)
+        val maxLowerLid = height * 0.105f * lowerFactor.coerceAtLeast(0.015f)
 
         val pupilNormOffsetX = computeScanOffsetX()
 
         val charSize = (width * 0.03f).coerceIn(17f, 32f)
-        browPaint.textSize = charSize * 0.92f
+        creasePaint.textSize = charSize * 0.8f
         lidPaint.textSize = charSize
-        lashPaint.textSize = charSize * 0.85f
+        lashPaint.textSize = charSize * 0.84f
         scleraPaint.textSize = charSize * 0.9f
         irisPaint.textSize = charSize
         pupilPaint.textSize = charSize * 1.12f
         streamPaint.textSize = charSize * 0.85f
 
         val isGreenMode = currentState == EyeState.CONNECTING || currentState == EyeState.CONNECTED
+        val eyeVisibility = ((openProgress + 0.08f) / 1.08f).coerceIn(0f, 1f)
 
-        val browSteps = 27
-        val browBaseY = eyeCenterY - maxUpperLid - charSize * 3.1f
-        browPaint.color = if (isGreenMode) colorBrowActive else colorBrow
-        for (i in 0 until browSteps) {
-            val u = (i / (browSteps - 1f)) * 2f - 1f
-            val bx = centerX + u * (eyeHalfWidth * 1.04f)
-            val arch = (1f - u * u) * (charSize * 1.15f) - (u * 0.35f * charSize)
-            val byCenter = browBaseY - arch
-            val thicknessRows = when {
-                u < -0.2f -> 4
-                u < 0.45f -> 3
-                u < 0.8f -> 2
-                else -> 1
-            }
-            for (t in 0 until thicknessRows) {
-                val offsetY = (t - thicknessRows / 2f) * (charSize * 0.52f)
-                val slant = when {
-                    u < -0.15f -> if (t % 2 == 0) '/' else '|'
-                    u > 0.35f -> if (t % 2 == 0) '\\' else '-'
-                    else -> browChars[(i * 3 + t * 5) % browChars.size]
-                }
-                val edgeFade = (1f - abs(u) * 0.45f).coerceIn(0.45f, 1f)
-                browPaint.alpha = (225 * edgeFade).toInt().coerceIn(80, 255)
-                canvas.drawText(slant.toString(), bx, byCenter + offsetY, browPaint)
-            }
-        }
-
+        // 1. Поток кода строго под нижней округлостью глаза (включая закрытое состояние)
         val activeStreamColor = if (isGreenMode) colorCodeGreen else colorCodeGray
-        val maxStreamDrop = (height * 0.46f).coerceAtLeast(140f)
+        val maxStreamDrop = (height * 0.48f).coerceAtLeast(140f)
 
         for (grain in codeGrains) {
             if (grain.y > maxStreamDrop) continue
@@ -297,9 +279,52 @@ class CodeEyeView @JvmOverloads constructor(
             canvas.drawText(grain.glyph.toString(), gx, gy, streamPaint)
         }
 
-        val cols = 21
+        // 2. Детализированный закрытый глаз (складка века, естественный изгиб сомкнутых век и ресницы)
+        val cols = 23
         val rows = 13
 
+        if (eyeVisibility < 0.25f) {
+            val closedWeight = (1f - eyeVisibility / 0.25f).coerceIn(0f, 1f)
+            for (c in 0 until cols) {
+                val colNorm = (c / (cols - 1f)) * 2f - 1f
+                val arch = (1f - abs(colNorm).pow(1.75f)).coerceAtLeast(0f)
+                val x = centerX + colNorm * eyeHalfWidth
+                // Лёгкий естественный наклон к внешнему краю и мягкая дуга века
+                val baseClosedY = eyeCenterY - arch * (charSize * 0.45f) + (colNorm * colNorm * charSize * 0.22f)
+
+                // Верхняя складка века над сомкнутым глазом
+                if (arch > 0.15f) {
+                    val creaseY = baseClosedY - charSize * (0.95f + arch * 0.55f)
+                    creasePaint.alpha = (135 * closedWeight * arch).toInt().coerceIn(35, 160)
+                    canvas.drawText(creaseChars[c % creaseChars.size].toString(), x, creaseY, creasePaint)
+                }
+
+                // Сомкнутое веко (более плотная линия по центру и к уголкам)
+                lidPaint.color = if (abs(colNorm) > 0.82f) colorLidDark else colorLid
+                lidPaint.alpha = (235 * closedWeight).toInt().coerceIn(60, 245)
+                val closedGlyph = when {
+                    abs(colNorm) > 0.92f -> if (colNorm < 0f) '<' else '>'
+                    arch > 0.65f -> closedLidChars[c % closedLidChars.size]
+                    else -> '-'
+                }
+                canvas.drawText(closedGlyph.toString(), x, baseClosedY, lidPaint)
+
+                // Ресницы вдоль линии сомкнутого века (направлены вниз и чуть наружу)
+                if (arch > 0.12f && c % 2 == 0) {
+                    val lashX = x + colNorm * charSize * 0.35f
+                    val lashY = baseClosedY + charSize * (0.55f + arch * 0.35f)
+                    lashPaint.alpha = (175 * closedWeight * arch).toInt().coerceIn(50, 210)
+                    val lashGlyph = when {
+                        colNorm < -0.25f -> '\\'
+                        colNorm > 0.25f -> '/'
+                        else -> '|'
+                    }
+                    canvas.drawText(lashGlyph.toString(), lashX, lashY, lashPaint)
+                }
+            }
+        }
+
+        // 3. Естественное раскрытие глаза: верхнее и нижнее веко, ресницы, белок, радужка и зрачок
         for (r in -rows / 2..rows / 2) {
             val rowNorm = r / (rows / 2f)
             for (c in -cols / 2..cols / 2) {
@@ -314,34 +339,34 @@ class CodeEyeView @JvmOverloads constructor(
                     eyeCenterY + rowNorm * maxLowerLid * almondFactor
                 }
 
+                // Верхние и нижние ресницы при открытии
                 val isUpperBorder = r == -rows / 2 && almondFactor > 0.1f
                 val isLowerBorder = r == rows / 2 && almondFactor > 0.15f
-                if (isUpperBorder && openProgress > 0.1f) {
-                    val lashSlope = -colNorm * 0.45f
-                    val lashX = x + lashSlope * charSize * 0.5f
-                    val lashY = y - charSize * (0.65f + 0.35f * almondFactor)
-                    lashPaint.alpha = (145 + 100 * openProgress).toInt().coerceIn(120, 255)
+                if (isUpperBorder && eyeVisibility > 0.12f) {
+                    val lashSlope = -colNorm * 0.5f
+                    val lashX = x + lashSlope * charSize * 0.55f
+                    val lashY = y - charSize * (0.65f + 0.38f * almondFactor)
+                    lashPaint.alpha = (150 + 100 * eyeVisibility).toInt().coerceIn(100, 255)
                     val lashGlyph = if (colNorm < -0.2f) '\\' else if (colNorm > 0.2f) '/' else '|'
                     canvas.drawText(lashGlyph.toString(), lashX, lashY, lashPaint)
-                } else if (isLowerBorder && openProgress > 0.35f) {
-                    val lashY = y + charSize * 0.65f
-                    lashPaint.alpha = 140
+                } else if (isLowerBorder && eyeVisibility > 0.35f) {
+                    val lashY = y + charSize * 0.62f
+                    lashPaint.alpha = (145 * eyeVisibility).toInt().coerceIn(70, 180)
                     canvas.drawText(lashChars[abs(c) % lashChars.size].toString(), x, lashY, lashPaint)
                 }
 
-                val onLidEdge = abs(abs(rowNorm) - 1f) < 0.22f || (openProgress < 0.2f && r == 0)
+                // Контур век при раскрытии
+                val onLidEdge = eyeVisibility >= 0.2f && abs(abs(rowNorm) - 1f) < 0.22f
                 if (onLidEdge) {
+                    lidPaint.color = if (rowNorm < 0f) colorLid else colorLidDark
                     lidPaint.alpha = 240
-                    val ch = if (openProgress < 0.2f) {
-                        if (abs(colNorm) < 0.88f) '-' else '>'
-                    } else {
-                        lidChars[(abs(r * 5 + c * 11)) % lidChars.size]
-                    }
+                    val ch = openLidChars[(abs(r * 5 + c * 11)) % openLidChars.size]
                     canvas.drawText(ch.toString(), x, y, lidPaint)
                     continue
                 }
 
-                if (openProgress > 0.22f && abs(rowNorm) < 0.92f) {
+                // Внутренняя часть глаза: белок, радужка и зрачок
+                if (eyeVisibility > 0.22f && abs(rowNorm) < 0.92f) {
                     val verticalScale = if (rowNorm < 0f) maxUpperLid else maxLowerLid
                     val vNorm = if (verticalScale > 1f) {
                         abs(y - eyeCenterY) / verticalScale
@@ -378,7 +403,7 @@ class CodeEyeView @JvmOverloads constructor(
                                 canvas.drawText("*", x, y, scleraPaint)
                             } else {
                                 scleraPaint.color = colorSclera
-                                scleraPaint.alpha = (195 * openProgress).toInt().coerceIn(90, 235)
+                                scleraPaint.alpha = (195 * eyeVisibility).toInt().coerceIn(90, 235)
                                 val sGlyph = scleraChars[(abs(r * 7 + c * 5)) % scleraChars.size]
                                 canvas.drawText(sGlyph.toString(), x, y, scleraPaint)
                             }

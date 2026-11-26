@@ -436,7 +436,8 @@ class CodeEyeView @JvmOverloads constructor(
 
                 val activeShift = if (isTelegramActive) 2 else 0
                 val digitIdx = (r * 7 + c * 3 + activeShift) % numericGlyphs.size
-                canvas.drawText(numericGlyphs[digitIdx], px, py, telegramPaint)
+                val digitText = numericGlyphs[digitIdx]
+                canvas.drawText(digitText, px, py, telegramPaint)
             }
         }
     }
@@ -540,4 +541,4 @@ class CodeEyeView @JvmOverloads constructor(
                             shadowPaint.color = colorShadowDeep
                             shadowPaint.alpha = (160f * closedWeight * arch).toInt().coerceIn(35, 185)
                             val gIdx = (c * 5 + layer) % closedLineGlyphs.size
-                            canvas.drawText(c
+   
